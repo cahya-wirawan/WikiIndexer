@@ -1,8 +1,5 @@
 import os
 
-# Used to import data from local.
-import pandas as pd
-
 # Used to create the dense document vectors.
 import torch
 from sentence_transformers import SentenceTransformer, models
@@ -12,7 +9,6 @@ from tqdm import tqdm
 # Used to create and store the Faiss index.
 import faiss
 import numpy as np
-import pickle
 from pathlib import Path
 
 # Dimension Reduction using PCA
@@ -46,7 +42,7 @@ if not os.path.exists(model_name):
     dense.linear.weight = torch.nn.Parameter(torch.tensor(pca_comp))
     model.add_module('dense', dense)
 
-    model.save(f"distilbert-base-128")
+    model.save(model_name)
     del(pca_train_sentences)
     del(wiki_sentences)
 else:
