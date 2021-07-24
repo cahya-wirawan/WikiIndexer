@@ -20,34 +20,39 @@ from sklearn.decomposition import PCA
 
 model_name = "distilbert-base-128"
 
-model = SentenceTransformer('distilbert-base-nli-stsb-mean-tokens')
-
-if torch.cuda.is_available():
-   model = model.to(torch.device("cuda"))
-print(model.device)
-
 wiki_snippets = datasets.load_dataset("wiki_snippets", "wiki40b_en_100_0")
 passages_length = len(wiki_snippets["train"])
+device = torch.device("cuda")
 
-new_dimension = 128
-wiki_snippets_shuffled = wiki_snippets.shuffle(seed=42)
-wiki_sentences = list(wiki_snippets_shuffled['train'][:100000]["passage_text"])
-pca_train_sentences = wiki_sentences
-train_embeddings = model.encode(pca_train_sentences, convert_to_numpy=True, show_progress_bar=True)
+if not os.path.exists(model_name):
+    model = SentenceTransformer('distilbert-base-nli-stsb-mean-tokens')
 
-print("Compute the PCA")
-#Compute PCA on the train embeddings matrix
-pca = PCA(n_components=new_dimension)
-pca.fit(train_embeddings)
-pca_comp = np.asarray(pca.components_)
+    if torch.cuda.is_available():
+        model = model.to(device)
+    print(model.device)
+    new_dimension = 128
+    wiki_snippets_shuffled = wiki_snippets.shuffle(seed=42)
+    wiki_sentences = list(wiki_snippets_shuffled['train'][:100000]["passage_text"])
+    pca_train_sentences = wiki_sentences
+    train_embeddings = model.encode(pca_train_sentences, convert_to_numpy=True, show_progress_bar=True)
 
-dense = models.Dense(in_features=model.get_sentence_embedding_dimension(), out_features=new_dimension, bias=False, activation_function=torch.nn.Identity())
-dense.linear.weight = torch.nn.Parameter(torch.tensor(pca_comp))
-model.add_module('dense', dense)
+    print("Compute the PCA")
+    #Compute PCA on the train embeddings matrix
+    pca = PCA(n_components=new_dimension)
+    pca.fit(train_embeddings)
+    pca_comp = np.asarray(pca.components_)
 
-model.save(f"distilbert-base-128")
-del(pca_train_sentences)
-del(wiki_sentences)
+    dense = models.Dense(in_features=model.get_sentence_embedding_dimension(), out_features=new_dimension, bias=False, activation_function=torch.nn.Identity())
+    dense.linear.weight = torch.nn.Parameter(torch.tensor(pca_comp))
+    model.add_module('dense', dense)
+
+    model.save(f"distilbert-base-128")
+    del(pca_train_sentences)
+    del(wiki_sentences)
+else:
+    model = SentenceTransformer(model_name)
+    if torch.cuda.is_available():
+        model = model.to(device)
 
 batch_size = 64000
 steps = passages_length//batch_size
@@ -55,6 +60,7 @@ print("Start encoding the passages", passages_length, batch_size, steps)
 
 # Convert abstracts to vectors
 embeddings = None
+end = 0
 for step in tqdm(range(steps)):
     start, end = step*batch_size, (step+1)*batch_size
     if embeddings is None:
