@@ -21,6 +21,7 @@ if len(sys.argv) == 2:
 else:
     new_dimension = 128
 model_name = f"distilbert-base-{new_dimension}"
+print(f"Model name: {model_name}")
 
 wiki_snippets = datasets.load_dataset("wiki_snippets", "wiki40b_en_100_0")
 passages_length = len(wiki_snippets["train"])
