@@ -94,7 +94,7 @@ print(f"Number of vectors in the Faiss index: {index.ntotal}")
 
 project_dir = Path('.').resolve()
 
-index_path = f"{project_dir}/wiki_faiss.idx"
+index_path = f"{project_dir}/wiki_faiss_{new_dimension}.idx"
 faiss.write_index(index, index_path)
 
 id = faiss.read_index(index_path)
