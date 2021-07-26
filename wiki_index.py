@@ -38,7 +38,8 @@ class WikiIndex:
             res = faiss.StandardGpuResources()
             self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
 
-    def get_url(self, wiki_id):
+    @staticmethod
+    def get_url(wiki_id):
         try:
             url = f"https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=sitelinks&sitefilter=enwiki&ids={wiki_id}"
             req = requests.get(url, headers=WikiIndex.headers)
