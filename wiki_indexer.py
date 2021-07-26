@@ -1,4 +1,5 @@
 import os
+import sys
 
 # Used to create the dense document vectors.
 import torch
@@ -14,7 +15,13 @@ from pathlib import Path
 # Dimension Reduction using PCA
 from sklearn.decomposition import PCA
 
-model_name = "distilbert-base-128"
+
+if len(sys.argv) == 2:
+    new_dimension = int(sys.argv[1])
+else:
+    new_dimension = 128
+model_name = f"distilbert-base-{new_dimension}"
+print(f"Model name: {model_name}")
 
 wiki_snippets = datasets.load_dataset("wiki_snippets", "wiki40b_en_100_0")
 passages_length = len(wiki_snippets["train"])
@@ -26,7 +33,6 @@ if not os.path.exists(model_name):
     if torch.cuda.is_available():
         model = model.to(device)
     print(model.device)
-    new_dimension = 128
     wiki_snippets_shuffled = wiki_snippets.shuffle(seed=42)
     wiki_sentences = list(wiki_snippets_shuffled['train'][:100000]["passage_text"])
     pca_train_sentences = wiki_sentences
@@ -88,7 +94,7 @@ print(f"Number of vectors in the Faiss index: {index.ntotal}")
 
 project_dir = Path('.').resolve()
 
-index_path = f"{project_dir}/wiki_faiss.idx"
+index_path = f"{project_dir}/wiki_faiss_{new_dimension}.idx"
 faiss.write_index(index, index_path)
 
 id = faiss.read_index(index_path)
