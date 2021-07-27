@@ -63,17 +63,15 @@ class WikiIndex:
             passage_index = sorted(passage_index.items(), key=lambda item: item[1])
             D = [pi[1] for pi in passage_index]
             I = [pi[0] for pi in passage_index]
+        urls = []
         if include_urls:
-            urls = []
             for index in I:
                 wiki_id = WikiIndex.wiki_snippets['train'][index]["wiki_id"]
                 urls.append(self.get_url(wiki_id))
-            return D, I, urls
-        else:
-            return D, I
+        return D, I, urls
 
     def get_image(self, text, image_width=400):
-        D, I = self.search(text)
+        D, I, urls = self.search(text)
         image = None
         try:
             for index in I:
