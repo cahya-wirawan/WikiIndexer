@@ -18,8 +18,8 @@ class ImageInput(BaseModel):
 
 
 class SearchResponse(BaseModel):
-    probabilities: List[float] = [],
-    passage_index: List[int] = [],
+    probabilities: List[float] = []
+    passage_index: List[int] = []
     urls: List[str] = []
 
 
