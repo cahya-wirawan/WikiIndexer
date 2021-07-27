@@ -3,8 +3,7 @@ set -e
 
 cd /fastapi/WikiSearch
 git pull
-cp wiki_index.py /fastapi
-cd /fastapi
+cd /fastapi/WikiSearch/app
 
 if [ "$DEBUG" = true ] ; then
     echo 'Debugging - ON'

@@ -9,7 +9,7 @@ WORKDIR /fastapi
 RUN pip install -r requirements.txt --default-timeout=100
 RUN git clone https://github.com/cahya-wirawan/WikiSearch.git
 
-COPY . /fastapi
+COPY start.sh /fastapi
 
 EXPOSE 8000
 
