@@ -20,7 +20,7 @@ if len(sys.argv) == 2:
     new_dimension = int(sys.argv[1])
 else:
     new_dimension = 128
-model_name = f"distilbert-base-{new_dimension}"
+model_name = f"distilbert-base-wiki-{new_dimension}"
 print(f"Model name: {model_name}")
 
 wiki_snippets = datasets.load_dataset("wiki_snippets", "wiki40b_en_100_0")
@@ -34,7 +34,7 @@ if not os.path.exists(model_name):
         model = model.to(device)
     print(model.device)
     wiki_snippets_shuffled = wiki_snippets.shuffle(seed=42)
-    wiki_sentences = list(wiki_snippets_shuffled['train'][:100000]["passage_text"])
+    wiki_sentences = list(wiki_snippets_shuffled['train'][:1000000]["passage_text"])
     pca_train_sentences = wiki_sentences
     train_embeddings = model.encode(pca_train_sentences, convert_to_numpy=True, show_progress_bar=True)
 
