@@ -7,14 +7,14 @@ from wiki_index import WikiIndex
 
 class SearchInput(BaseModel):
     text: str
-    k: int
-    include_urls: bool
-    weighted_passage: bool
+    k: int = 10
+    include_urls: bool = False
+    weighted_passage: bool = True
 
 
 class ImageInput(BaseModel):
     text: str
-    image_width: int
+    image_width: int = 400
 
 
 class SearchResponse(BaseModel):
