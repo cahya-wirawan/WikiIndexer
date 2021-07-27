@@ -72,22 +72,22 @@ class WikiIndex:
         else:
             return D, I
 
-    def get_image_url(self, text, index=0, image_width=400):
+    def get_image(self, text, image_width=400):
         D, I = self.search(text)
-        image_url = None
+        image = None
         try:
             for index in I:
                 wiki_id = WikiIndex.wiki_snippets['train'][index]["wiki_id"]
                 url = f"https://www.wikidata.org/wiki/{wiki_id}"
                 req = requests.get(url, headers=WikiIndex.headers)
                 soup = BeautifulSoup(req.content, 'html.parser')
-                image_url = soup.find(property="og:image")
-                if image_url is None:
+                image = soup.find(property="og:image")
+                if image is None:
                     continue
                 else:
-                    image_url = soup.find(property="og:image")["content"]
-                    image_url = re.sub(r'/\d*px-', f"/{image_width}px-", image_url)
+                    image = soup.find(property="og:image")["content"]
+                    image = re.sub(r'/\d*px-', f"/{image_width}px-", image)
                     break
         except TypeError:
-            image_url = None
-        return image_url
+            image = None
+        return image

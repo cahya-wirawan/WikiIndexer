@@ -6,42 +6,37 @@ from fastapi import FastAPI
 import torch
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
-from WikiSearch.wiki_index import WikiIndex
+from wiki_index import WikiIndex
 
 class Input(BaseModel):
     text: str
-    model_name: str
-    max_len: int
-    temp: float
-    top_k: int
-    top_p: float
-    do_sample: bool
+    k: int
+    include_urls: bool
+    weighted_passage: bool
 
 class TextGenResponse(BaseModel):
     result: str
 
 app = FastAPI(
-    title="Indonesian GPT-2 demo",
+    title="Wiki Search",
     version="0.1.0",
 )
 
-model_small = GPT2LMHeadModel.from_pretrained("flax-community/gpt2-small-indonesian")
-tokenizer_small = GPT2Tokenizer.from_pretrained("flax-community/gpt2-small-indonesian")
+wiki_index_file = "/models/wiki/wiki_faiss_128.idx"
+model_name = "/models/wiki/distilbert-base-wiki-128"
 
-MODELS = {
-    "GPT-2 Small": (
-        model_small,
-        tokenizer_small
-    )
-}
+wiki = WikiIndex(wiki_index_file,model_name)
 
 @app.get('/')
 def get_root():
-    return {'message': 'Indonesian GPT-2 demo'}
+    return {'message': 'Wiki Search'}
 
-@app.post('/generate/', response_model=TextGenResponse)
-def query_gpt(item: Input):
-    model, tokenizer = MODELS[item.model_name]
+@app.post('/search/', response_model=TextGenResponse)
+def search(item: Input):
+    D, I = wiki.search(item.text,
+                k=item.k,
+                include_urls=item.include_urls,
+                weighted_passage=item.weighted_passage)
 
     input_ids = tokenizer.encode(item.text, return_tensors='pt')
     output = model.generate(input_ids=input_ids,
