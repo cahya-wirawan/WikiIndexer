@@ -50,11 +50,19 @@ class WikiIndex:
             url = ""
         return url
 
-    def search(self, text, k=5, include_urls=False):
+    def search(self, text, k=5, include_urls=False, weighted_passage=True):
         embedding = self.model.encode(text, convert_to_numpy=True, show_progress_bar=True)
         # Retrieve the 10 nearest neighbours
         D, I = self.index.search(np.array([embedding]), k=k)
         D, I = D.flatten().tolist(), I.flatten().tolist()
+        if weighted_passage:
+            passage_index = {I[i]:d for i,d in enumerate(D)}
+            for index in passage_index:
+                if WikiIndex.wiki_snippets['train'][index]["start_character"] == 0:
+                    passage_index[index] = 0.5*passage_index[index]
+            passage_index = sorted(passage_index.items(), key=lambda item: item[1])
+            D = [pi[1] for pi in passage_index]
+            I = [pi[0] for pi in passage_index]
         if include_urls:
             urls = []
             for index in I:
