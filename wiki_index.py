@@ -88,4 +88,6 @@ class WikiIndex:
                     break
         except TypeError:
             image = None
+        if image is None:
+            image = ""
         return image
