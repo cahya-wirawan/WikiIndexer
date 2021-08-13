@@ -5,6 +5,7 @@ import sys
 import torch
 from sentence_transformers import SentenceTransformer, models
 import datasets
+import pandas as pd
 from tqdm import tqdm
 
 # Used to create and store the Faiss index.
@@ -22,6 +23,26 @@ else:
     new_dimension = 128
 model_name = f"distilbert-base-wiki-{new_dimension}"
 print(f"Model name: {model_name}")
+
+WIT_dir = "/mnt/mldata/data/WIT"
+WIT_files = ["wit_v1.train.all-1percent_sample.tsv"]
+
+def WIT_read(path: Path, lang="en", length=None):
+    df = pd.read_csv(path, sep="\t")
+    wit = []
+    counter = 0
+    for i, row in df.iterrows():
+        if length is not None and counter > length:
+            break
+        wit.append([row["caption_reference_description"], i])
+        wit.append([row["context_page_description"], i])
+        if row["context_page_description"] != row["context_section_description"]:
+            wit.append([row["context_section_description"], i])
+    return wit
+
+WIT_file = Path(WIT_dir)/Path(WIT_files[0])
+wit =  WIT_read(WIT_file, length=1000)
+exit()
 
 wiki_snippets = datasets.load_dataset("wiki_snippets", "wiki40b_en_100_0")
 passages_length = len(wiki_snippets["train"])
