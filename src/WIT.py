@@ -20,7 +20,7 @@ from pathlib import Path
 # Dimension Reduction using PCA
 from sklearn.decomposition import PCA
 
-WIT_dir = "/mnt/mldata/data/WIT"
+WIT_dir = "/mnt/mldata/data/WIT/test"
 # WIT_files = ["wit_v1.train.all-1percent_sample.tsv"]
 # WIT_files = ["test.tsv"]
 WIT_files = ["wit_v1.train.all-00000-of-00010.tsv"]
@@ -33,7 +33,7 @@ def WIT_read(path: Path, lang="en", length=None):
     image_urls = {}
     counter = 0
     with pd.read_csv(path, sep="\t", chunksize=100000) as reader:
-        for chunk in reader:
+        for x, chunk in enumerate(reader):
             for i, row in tqdm(chunk.iterrows(), total=len(chunk)):
                 if length is not None and counter > length:
                     break
@@ -41,26 +41,31 @@ def WIT_read(path: Path, lang="en", length=None):
                     image_urls[i] = row["image_url"]
                     if type(row["caption_reference_description"]) == str:
                         caption_reference_description = re.sub(r'\s{2,}', " ", row["caption_reference_description"])
-                        descriptions.append([caption_reference_description, i])
+                        descriptions.append(caption_reference_description)
                         index_map.append(i)
                     if type(row["context_page_description"]) == str:
                         context_page_description = re.sub(r'\s{2,}', " ", row["context_page_description"])
-                        descriptions.append([context_page_description, i])
+                        descriptions.append(context_page_description)
                         index_map.append(i)
                         if type(row["context_section_description"]) == str:
                             context_section_description = re.sub(r'\s{2,}', " ", row["context_section_description"])
                             if context_section_description != context_page_description:
-                                descriptions.append([context_section_description, i])
+                                descriptions.append(context_section_description)
                                 index_map.append(i)
                     elif type(row["context_section_description"]) == str:
                         context_section_description = re.sub(r'\s{2,}', " ", row["context_section_description"])
-                        descriptions.append([context_section_description, i])
+                        descriptions.append(context_section_description)
                         index_map.append(i)
                 if i % 100000 == 0:
-                    print(f"Size of desc: {deep_getsizeof(descriptions)/2**20:0.2f} MB, "
+                    print(f"{x}: Size of desc: {deep_getsizeof(descriptions)/2**20:0.2f} MB, "
                           f"image_urls: {deep_getsizeof(image_urls)/2**20:0.2f} MB, "
                           f"index_map: {deep_getsizeof(index_map)/2**20:0.2f} MB")
-    return np.array(descriptions), image_urls, index_map
+    return descriptions, image_urls, index_map
+
+
+for wit_file in Path(WIT_dir).glob("*.tsv"):
+    print(wit_file)
+exit(0)
 
 WIT_file = Path(WIT_dir)/Path(WIT_files[0])
 descriptions, image_urls, index_map = WIT_read(WIT_file)
@@ -91,7 +96,7 @@ if not os.path.exists(model_name):
         model = model.to(device)
     print(model.device)
     #wiki_snippets_shuffled = wiki_snippets.shuffle(seed=42)
-    wiki_sentences = descriptions[:int(0.2*passages_length), 0]
+    wiki_sentences = descriptions[:int(0.2*len(descriptions))]
     pca_train_sentences = wiki_sentences
     train_embeddings = model.encode(pca_train_sentences, convert_to_numpy=True, show_progress_bar=True)
 
@@ -113,7 +118,7 @@ else:
     if torch.cuda.is_available():
         model = model.to(device)
 
-batch_size = 6400
+batch_size = 16000
 steps = passages_length//batch_size
 print("Start encoding the passages", passages_length, batch_size, steps)
 
@@ -123,16 +128,16 @@ end = 0
 for step in tqdm(range(steps)):
     start, end = step*batch_size, (step+1)*batch_size
     if embeddings is None:
-        texts = descriptions[start:end, 0]
+        texts = descriptions[start:end]
         embeddings = model.encode(texts, show_progress_bar=True)
     else:
-        texts = descriptions[start:end, 0]
+        texts = descriptions[start:end]
         embeddings = np.append(embeddings,
                            model.encode(texts, show_progress_bar=True), axis=0)
 
 if end < passages_length:
     embeddings = np.append(embeddings,
-                           model.encode(descriptions[end:passages_length, 0], show_progress_bar=True), axis=0)
+                           model.encode(descriptions[end:passages_length], show_progress_bar=True), axis=0)
 print(embeddings.shape)
 wiki_ids = np.array(range(passages_length))
 
@@ -159,4 +164,4 @@ search_id = 30
 id = faiss.read_index(index_path)
 D, I = id.search(np.array([embeddings[search_id]]), k=10)
 print(f'L2 distance: {D.flatten().tolist()}\n\nMAG paper IDs: {I.flatten().tolist()}')
-print(f"text: << {descriptions[search_id, 0]} >>\nurl: {image_urls[index_map[search_id]]}")
+print(f"text: << {descriptions[search_id]} >>\nurl: {image_urls[index_map[search_id]]}")
