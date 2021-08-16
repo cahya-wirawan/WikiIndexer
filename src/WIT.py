@@ -130,8 +130,10 @@ last_dataframe_size = 0
 for wit_file in sorted(Path(WIT_dir).glob("*.tsv")):
     print(wit_file)
     descriptions, image_urls, index_map, dataframe_size = WIT_read(wit_file)
+    image_urls = {key+last_dataframe_size:image_urls[key] for key in image_urls}
     wit_dataset["image_urls"] = {**wit_dataset["image_urls"], **image_urls}
-    wit_dataset["index_map"] = wit_dataset["index_map"] + [i+last_dataframe_size for i in index_map]
+    index_map = [i+last_dataframe_size for i in index_map]
+    wit_dataset["index_map"] = wit_dataset["index_map"] + index_map
     last_dataframe_size += dataframe_size
     passages_length = len(descriptions)
     if wit_counter == 0:
@@ -169,27 +171,33 @@ faiss.write_index(index, index_path)
 
 
 faiss_index = faiss.read_index(index_path)
-last_dataframe_size = 0
+descriptions_size = 0
 descriptions_test = []
+last_dataframe_size = 0
 
-random.seed(10)
+random.seed(100)
 for wit_file in sorted(Path(WIT_dir).glob("*.tsv")):
     print(wit_file)
     descriptions, image_urls, index_map, dataframe_size = WIT_read(wit_file)
 
     index_test = sorted([randint(0, len(descriptions)) for i in range(10)])
-    descriptions_test += [[descriptions[i], i+last_dataframe_size] for i in index_test]
-    last_dataframe_size += len(descriptions)
+    descriptions_test += [[descriptions[i], i+descriptions_size] for i in index_test]
+    last_dataframe_size += dataframe_size
+    descriptions_size += len(descriptions)
 
 descriptions = [value[0] for value in descriptions_test]
 embeddings = model.encode(descriptions, show_progress_bar=True)
 
 for i, value in enumerate(descriptions_test):
     D, I = faiss_index.search(np.array([embeddings[i]]), k=10)
-    print(f"\n### Search id = {value[1]}")
+    print(f"\n### {i:} Search id = {value[1]}")
     print(f'L2 distance: {D.flatten().tolist()}\nMAG paper IDs: {I.flatten().tolist()}')
     print(f"text: << {value[0]} >>")
-    print(f"url: {wit_dataset['image_urls'][wit_dataset['index_map'][value[1]]]}")
+    print(f"value: << {value[1]} >>")
+    index_url = wit_dataset['index_map'][value[1]]
+    print(f"index_url: {index_url}")
+    print(f"url: {wit_dataset['image_urls'][index_url]}")
+    assert (I[0][0] == value[1] or I[0][1] == value[1])
 
 exit(0)
 
