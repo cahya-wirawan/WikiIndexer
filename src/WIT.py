@@ -169,13 +169,16 @@ pickle.dump(wit_dataset, open(f"{project_dir}/wit_dataset.pkl", "wb"))
 index_path = f"{project_dir}/wiki_faiss_{new_dimension}.idx"
 faiss.write_index(index, index_path)
 
+"""
+We test now the faiss index with some random entries from the datasets
+"""
 
 faiss_index = faiss.read_index(index_path)
 descriptions_size = 0
 descriptions_test = []
 last_dataframe_size = 0
 
-random.seed(1000)
+random.seed(100)
 for wit_file in sorted(Path(WIT_dir).glob("*.tsv")):
     print(wit_file)
     descriptions, image_urls, index_map, dataframe_size = WIT_read(wit_file)
