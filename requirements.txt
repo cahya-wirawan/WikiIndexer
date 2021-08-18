@@ -10,3 +10,5 @@ datasets
 faiss-cpu
 numpy
 torch
+pandas
+tqdm
