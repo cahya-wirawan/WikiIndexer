@@ -22,7 +22,7 @@ from pathlib import Path
 # Dimension Reduction using PCA
 from sklearn.decomposition import PCA
 
-WIT_dir = "/mnt/mldata/data/WIT/test"
+WIT_dir = "/mnt/mldata/data/WIT/orig"
 # WIT_files = ["wit_v1.train.all-1percent_sample.tsv"]
 # WIT_files = ["test.tsv"]
 WIT_files = ["wit_v1.train.all-00000-of-00010.tsv"]
@@ -34,7 +34,7 @@ def WIT_read(path: Path, lang="en", length=None):
     index_map = []
     image_urls = {}
     dataframe_size = 0
-    chunksize = 100
+    chunksize = 100000
     with pd.read_csv(path, sep="\t", chunksize=chunksize) as reader:
         for x, chunk in enumerate(reader):
             dataframe_size += len(chunk)
@@ -115,7 +115,7 @@ print(f"Model name: {model_name}")
 device = torch.device("cuda")
 wit_counter = 0
 model = None
-batch_size = 64
+batch_size = 16000
 wiki_ids = []
 
 # Instantiate the index
@@ -137,7 +137,7 @@ for wit_file in sorted(Path(WIT_dir).glob("*.tsv")):
     last_dataframe_size += dataframe_size
     passages_length = len(descriptions)
     if wit_counter == 0:
-        model = create_sentence_model(model_name)
+        model = create_sentence_model(model_name, pct=0.25)
 
     steps = passages_length // batch_size
     print("Start encoding the passages", passages_length, batch_size, steps)
