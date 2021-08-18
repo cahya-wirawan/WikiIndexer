@@ -10,13 +10,12 @@ class WitDataset:
         pass
 
     @staticmethod
-    def read(path: Path, lang="en", length=None):
+    def read(path: Path, lang="en", length=None, chunksize=100000):
         print(f"Reading the wit_dataset {path}")
         descriptions = []
         desc2image_map = []
         image_info = {}
         dataframe_size = 0
-        chunksize = 100000
         with pd.read_csv(path, sep="\t", chunksize=chunksize) as reader:
             for x, chunk in enumerate(reader):
                 dataframe_size += len(chunk)
@@ -24,11 +23,14 @@ class WitDataset:
                     if length is not None and len(descriptions) > length:
                         return descriptions, image_info, desc2image_map, dataframe_size
                     if row["language"] == lang:
-                        image_info[i] = [row["image_url"], row["caption_reference_description"]]
                         if type(row["caption_reference_description"]) == str:
-                            caption_reference_description = re.sub(r'\s{2,}', " ", row["caption_reference_description"])
+                            caption_reference_description = re.sub(r"\([^)]+\)", "", row["caption_reference_description"])
+                            caption_reference_description = re.sub(r'\s{2,}', " ", caption_reference_description)
+                            image_info[i] = [row["image_url"], caption_reference_description]
                             descriptions.append(caption_reference_description)
                             desc2image_map.append(i)
+                        else:
+                            image_info[i] = [row["image_url"], ""]
                         if type(row["context_page_description"]) == str:
                             context_page_description = re.sub(r'\s{2,}', " ", row["context_page_description"])
                             descriptions.append(context_page_description)
