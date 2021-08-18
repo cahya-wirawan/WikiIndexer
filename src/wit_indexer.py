@@ -1,17 +1,13 @@
 import random
-import re
-from pathlib import Path
 import os
 import sys
 import pickle
-from deep_getsizeof import deep_getsizeof
-from random import randint, seed
+from random import randint
+from wit_dataset import WitDataset
 
 # Used to create the dense document vectors.
 import torch
 from sentence_transformers import SentenceTransformer, models
-import datasets
-import pandas as pd
 from tqdm import tqdm
 
 # Used to create and store the Faiss index.
@@ -22,49 +18,10 @@ from pathlib import Path
 # Dimension Reduction using PCA
 from sklearn.decomposition import PCA
 
-WIT_dir = "/mnt/mldata/data/WIT/orig"
+WIT_dir = "/mnt/mldata/data/WIT/test"
 # WIT_files = ["wit_v1.train.all-1percent_sample.tsv"]
 # WIT_files = ["test.tsv"]
 WIT_files = ["wit_v1.train.all-00000-of-00010.tsv"]
-
-def WIT_read(path: Path, lang="en", length=None):
-    print(f"Reading the wit_dataset {path}")
-    #print(f"Size of pandas dataframe: {getsizeof(df)}")
-    descriptions = []
-    index_map = []
-    image_urls = {}
-    dataframe_size = 0
-    chunksize = 100000
-    with pd.read_csv(path, sep="\t", chunksize=chunksize) as reader:
-        for x, chunk in enumerate(reader):
-            dataframe_size += len(chunk)
-            for i, row in tqdm(chunk.iterrows(), total=len(chunk)):
-                if length is not None and len(descriptions) > length:
-                    return descriptions, image_urls, index_map, dataframe_size
-                if row["language"] == lang:
-                    image_urls[i] = row["image_url"]
-                    if type(row["caption_reference_description"]) == str:
-                        caption_reference_description = re.sub(r'\s{2,}', " ", row["caption_reference_description"])
-                        descriptions.append(caption_reference_description)
-                        index_map.append(i)
-                    if type(row["context_page_description"]) == str:
-                        context_page_description = re.sub(r'\s{2,}', " ", row["context_page_description"])
-                        descriptions.append(context_page_description)
-                        index_map.append(i)
-                        if type(row["context_section_description"]) == str:
-                            context_section_description = re.sub(r'\s{2,}', " ", row["context_section_description"])
-                            if context_section_description != context_page_description:
-                                descriptions.append(context_section_description)
-                                index_map.append(i)
-                    elif type(row["context_section_description"]) == str:
-                        context_section_description = re.sub(r'\s{2,}', " ", row["context_section_description"])
-                        descriptions.append(context_section_description)
-                        index_map.append(i)
-                if i % 100000 == 0:
-                    print(f"{x}: Size of desc: {deep_getsizeof(descriptions)/2**20:0.2f} MB, "
-                          f"image_urls: {deep_getsizeof(image_urls)/2**20:0.2f} MB, "
-                          f"index_map: {deep_getsizeof(index_map)/2**20:0.2f} MB")
-    return descriptions, image_urls, index_map, dataframe_size
 
 
 def create_sentence_model(model_name, pct=1.0):
@@ -91,8 +48,8 @@ def create_sentence_model(model_name, pct=1.0):
         model.add_module('dense', dense)
 
         model.save(model_name)
-        del (pca_train_sentences)
-        del (wiki_sentences)
+        del pca_train_sentences
+        del wiki_sentences
     else:
         model = SentenceTransformer(model_name)
         if torch.cuda.is_available():
@@ -102,8 +59,8 @@ def create_sentence_model(model_name, pct=1.0):
 
 
 wit_dataset = {
-    "image_urls": {},
-    "index_map": []
+    "image_info": {},
+    "desc2image_map": []
 }
 if len(sys.argv) == 2:
     new_dimension = int(sys.argv[1])
@@ -115,7 +72,7 @@ print(f"Model name: {model_name}")
 device = torch.device("cuda")
 wit_counter = 0
 model = None
-batch_size = 16000
+batch_size = 64000
 wiki_ids = []
 
 # Instantiate the index
@@ -129,16 +86,19 @@ last_dataframe_size = 0
 
 for wit_file in sorted(Path(WIT_dir).glob("*.tsv")):
     print(wit_file)
-    descriptions, image_urls, index_map, dataframe_size = WIT_read(wit_file)
-    image_urls = {key+last_dataframe_size:image_urls[key] for key in image_urls}
-    wit_dataset["image_urls"] = {**wit_dataset["image_urls"], **image_urls}
-    index_map = [i+last_dataframe_size for i in index_map]
-    wit_dataset["index_map"] = wit_dataset["index_map"] + index_map
+    descriptions, image_info, desc2image_map, dataframe_size = WitDataset.read(wit_file)
+    image_info = {key+last_dataframe_size: image_info[key] for key in image_info}
+    wit_dataset["image_info"] = {**wit_dataset["image_info"], **image_info}
+    desc2image_map = [i+last_dataframe_size for i in desc2image_map]
+    wit_dataset["desc2image_map"] = wit_dataset["desc2image_map"] + desc2image_map
     last_dataframe_size += dataframe_size
     passages_length = len(descriptions)
     if wit_counter == 0:
         model = create_sentence_model(model_name, pct=0.25)
 
+    while passages_length <= batch_size:
+        batch_size = batch_size >> 1
+    print(f"\nBatch size: {batch_size}")
     steps = passages_length // batch_size
     print("Start encoding the passages", passages_length, batch_size, steps)
     # Convert abstracts to vectors
@@ -166,7 +126,7 @@ for wit_file in sorted(Path(WIT_dir).glob("*.tsv")):
 
 project_dir = Path('.').resolve()
 pickle.dump(wit_dataset, open(f"{project_dir}/wit_dataset.pkl", "wb"))
-index_path = f"{project_dir}/wiki_faiss_{new_dimension}.idx"
+index_path = f"{project_dir}/wit_faiss_{new_dimension}.idx"
 faiss.write_index(index, index_path)
 
 """
@@ -178,12 +138,12 @@ descriptions_size = 0
 descriptions_test = []
 last_dataframe_size = 0
 
-random.seed(100)
+random.seed(10)
 for wit_file in sorted(Path(WIT_dir).glob("*.tsv")):
     print(wit_file)
-    descriptions, image_urls, index_map, dataframe_size = WIT_read(wit_file)
+    descriptions, image_info, desc2image_map, dataframe_size = WitDataset.read(wit_file)
 
-    index_test = sorted([randint(0, len(descriptions)) for i in range(10)])
+    index_test = sorted([randint(0, len(descriptions)-1) for i in range(10)])
     descriptions_test += [[descriptions[i], i+descriptions_size] for i in index_test]
     last_dataframe_size += dataframe_size
     descriptions_size += len(descriptions)
@@ -192,14 +152,14 @@ descriptions = [value[0] for value in descriptions_test]
 embeddings = model.encode(descriptions, show_progress_bar=True)
 
 for i, value in enumerate(descriptions_test):
-    D, I = faiss_index.search(np.array([embeddings[i]]), k=10)
+    distance, index = faiss_index.search(np.array([embeddings[i]]), k=10)
     print(f"\n### {i:} Search id = {value[1]}")
-    print(f'L2 distance: {D.flatten().tolist()}\nMAG paper IDs: {I.flatten().tolist()}')
+    print(f'L2 distance: {distance.flatten().tolist()}\nMAG paper IDs: {index.flatten().tolist()}')
     print(f"text: << {value[0]} >>")
     print(f"value: << {value[1]} >>")
-    index_url = wit_dataset['index_map'][value[1]]
+    index_url = wit_dataset['desc2image_map'][value[1]]
     print(f"index_url: {index_url}")
-    print(f"url: {wit_dataset['image_urls'][index_url]}")
-    assert (I[0][0] == value[1] or I[0][1] == value[1])
+    print(f"url: {wit_dataset['image_info'][index_url]}")
+    assert (value[1] in index[0])
 
 exit(0)

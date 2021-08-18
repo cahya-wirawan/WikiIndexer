@@ -8,7 +8,9 @@ sentence-transformers==2.0.0
 bs4
 datasets
 faiss-cpu
+faiss-gpu
 numpy
 torch
 pandas
 tqdm
+sklearn
